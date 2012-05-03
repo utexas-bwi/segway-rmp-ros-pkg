@@ -426,11 +426,11 @@ private:
 
         // Get the linear acceleration limits in m/s^2.  Zero means infinite.
         n->param("linear_pos_accel_limit", this->linear_pos_accel_limit, 0.0);
-	n->param("linear_neg_accel_limit", this->linear_neg_accel_limit, 0.0);
+        n->param("linear_neg_accel_limit", this->linear_neg_accel_limit, 0.0);
 
         // Get the angular acceleration limits in deg/s^2.  Zero means infinite.
-	n->param("angular_pos_accel_limit", this->angular_pos_accel_limit, 0.0);
-	n->param("angular_neg_accel_limit", this->angular_neg_accel_limit, 0.0);
+        n->param("angular_pos_accel_limit", this->angular_pos_accel_limit, 0.0);
+        n->param("angular_neg_accel_limit", this->angular_neg_accel_limit, 0.0);
         
         // Check for valid acceleration limits
         if (this->linear_pos_accel_limit < 0) {
