@@ -61,6 +61,10 @@ public:
         this->odometry_x = 0.0;
         this->odometry_y = 0.0;
         this->odometry_w = 0.0;
+        this->linear_vel = 0.0;
+        this->angular_vel = 0.0;
+        this->target_linear_vel = 0.0;
+        this->target_angular_vel = 0.0;
         this->count = 0;
     }
     
@@ -163,8 +167,8 @@ public:
                      this->angular_vel -= this->angular_neg_accel_limit; 
             }
 
-            ROS_DEBUG("Sending move command: linear velocity = %f, angular velocity = %f", 
-               this->linear_vel, this->angular_vel);
+            // ROS_DEBUG("Sending move command: linear velocity = %f, angular velocity = %f", 
+            //    this->linear_vel, this->angular_vel);
 
             //if (this->linear_vel == 0 || this->angular_vel == 0) {
             //    ROS_INFO("Sending Segway Command: l=%f a=%f", this->linear_vel, this->angular_vel);
