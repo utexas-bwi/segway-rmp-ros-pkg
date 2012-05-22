@@ -27,5 +27,8 @@ installed: $(GIT_DIR)
 	cd $(GIT_DIR)/build && make $(ROS_PARALLEL_JOBS) && make install
 	touch installed
 
-clean:
-	rm -rf build bin lib include installed rospack_nosubdirs Modules
+build-clean:
+	rm -rf bin lib include installed rospack_nosubdirs Modules
+
+clean: build-clean
+	rm -rf build
