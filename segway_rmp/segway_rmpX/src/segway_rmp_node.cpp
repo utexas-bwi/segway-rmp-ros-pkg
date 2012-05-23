@@ -243,6 +243,8 @@ public:
             this->odometry_y += new_odometry_y;
         } else {
             this->first_odometry = false;
+            this->odometry_x = 0;
+            this->odometry_y = 0;
         }
         // No matter what update the previouse (last) displacements
         this->last_forward_displacement = forward_displacement;
