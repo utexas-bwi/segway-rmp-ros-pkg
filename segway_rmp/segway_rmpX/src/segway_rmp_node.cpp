@@ -176,8 +176,7 @@ public:
             try {
                 this->segway_rmp->move(this->linear_vel, this->angular_vel);
             } catch (std::exception& e) {
-                std::string e_msg(e.what());
-                ROS_ERROR("Error commanding Segway RMP: %s", e_msg.c_str());
+                ROS_ERROR("Error commanding Segway RMP: %s", e.what());
                 this->connected = false;
                 this->disconnect();
             }
