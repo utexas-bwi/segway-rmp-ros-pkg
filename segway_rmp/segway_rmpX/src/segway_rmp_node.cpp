@@ -66,6 +66,7 @@ public:
         this->target_linear_vel = 0.0;
         this->target_angular_vel = 0.0;
         this->count = 0;
+        this->wait_for_odom_reset = true;
     }
     
     ~SegwayRMPNode() {
@@ -96,8 +97,11 @@ public:
         this->connected = false;
         while (ros::ok()) {
             try {
+                boost::mutex::scoped_lock lock(this->m_mutex);
                 this->segway_rmp->connect();
                 this->connected = true;
+                this->wait_for_odom_reset = true;
+                this->wait_for_odom_time = ros::Time::now();
             } catch (std::exception& e) {
                 std::string e_msg(e.what());
                 ROS_ERROR("Exception while connecting to the SegwayRMP, check your cables and power buttons.");
@@ -130,8 +134,11 @@ public:
      * command to the Segway RMP.
      */
     void keepAliveCallback(const ros::TimerEvent& e) {
+        boost::mutex::scoped_lock lock(this->m_mutex);
+        if (this->wait_for_odom_reset || !this->connected)
+          return;
+  
         if (ros::ok()) {
-            boost::mutex::scoped_lock lock(this->m_mutex);
 
             // Update the linear velocity based on the linear acceleration limits
             if (this->linear_vel < this->target_linear_vel) {
@@ -184,10 +191,35 @@ public:
     }
     
     void handleStatus(segwayrmp::SegwayStatus &ss) {
-        if (!this->connected)
-            return;
         // Get the time
         ros::Time current_time = ros::Time::now();
+
+        if (!this->connected)
+            return;
+
+        // Check if odometry needs to be reset
+        if (this->wait_for_odom_reset) {
+          if (fabs(ss.integrated_forward_position) < 1e-3 &&
+              fabs(ss.integrated_turn_position) < 1e-3 &&
+              fabs(ss.integrated_left_wheel_position) < 1e-3 &&
+              fabs(ss.integrated_right_wheel_position) < 1e-3) {
+            this->reset_integrated_forward_position = ss.integrated_forward_position;
+            this->reset_integrated_left_wheel_position = ss.integrated_left_wheel_position;
+            this->reset_integrated_right_wheel_position = ss.integrated_right_wheel_position;
+            this->reset_integrated_turn_position = ss.integrated_turn_position;
+            ROS_INFO("Odometry reset by Segway RMP");
+            this->wait_for_odom_reset = false;
+          } else if ((current_time - this->wait_for_odom_time).toSec() > 5) {
+            this->reset_integrated_forward_position = ss.integrated_forward_position;
+            this->reset_integrated_left_wheel_position = ss.integrated_left_wheel_position;
+            this->reset_integrated_right_wheel_position = ss.integrated_right_wheel_position;
+            this->reset_integrated_turn_position = ss.integrated_turn_position;
+            ROS_INFO("Odom reset unlikely... Updating default values"); 
+            this->wait_for_odom_reset = false;
+          } else {
+            return;
+          }
+        }
         
         this->sss_msg.header.stamp = current_time;
         
@@ -217,9 +249,9 @@ public:
         
         // Grab the newest Segway data
         float forward_displacement = 
-            ss.integrated_forward_position * this->linear_odom_scale;
+            (ss.integrated_forward_position - this->reset_integrated_forward_position) * this->linear_odom_scale;
         float yaw_displacement = 
-            ss.integrated_turn_position * degrees_to_radians * this->angular_odom_scale;
+            (ss.integrated_turn_position - this->reset_integrated_turn_position) * degrees_to_radians * this->angular_odom_scale;
         float yaw_rate = ss.yaw_rate * degrees_to_radians;
         
         // Integrate the displacements over time
@@ -229,22 +261,27 @@ public:
         if(!this->first_odometry) {
             float delta_forward_displacement = 
                 forward_displacement - this->last_forward_displacement;
+            //ROS_INFO_STREAM("dfd " << delta_forward_displacement);
             double delta_time = (current_time-this->last_time).toSec();
             // Update accumulated odometries and calculate the x and y components 
             // of velocity
             this->odometry_w = yaw_displacement;
-            float new_odometry_x = 
+            float delta_odometry_x = 
                 delta_forward_displacement * std::cos(this->odometry_w);
-            vel_x = (new_odometry_x - this->odometry_x)/delta_time;
-            this->odometry_x += new_odometry_x;
-            float new_odometry_y = 
+            vel_x = (delta_odometry_x)/delta_time;
+            this->odometry_x += delta_odometry_x;
+            float delta_odometry_y = 
                 delta_forward_displacement * std::sin(this->odometry_w);
-            vel_y = (new_odometry_y - this->odometry_y)/delta_time;
-            this->odometry_y += new_odometry_y;
+            vel_y = (delta_odometry_y)/delta_time;
+            this->odometry_y += delta_odometry_y;
         } else {
+            ROS_INFO("Initializaing odometry");
             this->first_odometry = false;
+            this->odometry_x = 0;
+            this->odometry_y = 0;
         }
         // No matter what update the previouse (last) displacements
+        //ROS_INFO_STREAM("fd " << forward_displacement);
         this->last_forward_displacement = forward_displacement;
         this->last_yaw_displacement = yaw_displacement;
         this->last_time = current_time;
@@ -256,6 +293,8 @@ public:
         // Publish the Transform odom->base_link
         if (this->broadcast_tf) {
             this->odom_trans.header.stamp = current_time;
+
+            //ROS_INFO_STREAM("(" << this->odometry_x << "," << this->odometry_y << ")");
             
             this->odom_trans.transform.translation.x = this->odometry_x;
             this->odom_trans.transform.translation.y = this->odometry_y;
@@ -302,9 +341,9 @@ public:
      * The handler for messages received on the 'cmd_vel' topic.
      */
     void cmd_velCallback(const geometry_msgs::Twist::ConstPtr& msg) {
+        boost::mutex::scoped_lock lock(m_mutex);
         if (!this->connected)
             return;
-        boost::mutex::scoped_lock lock(m_mutex);
         double x = msg->linear.x, z = msg->angular.z;
         if (this->invert_x) {
             x *= -1;
@@ -539,6 +578,14 @@ private:
     ros::Time last_time;
     
     boost::mutex m_mutex;
+
+    bool wait_for_odom_reset;
+    ros::Time wait_for_odom_time;
+    double reset_integrated_forward_position;
+    double reset_integrated_left_wheel_position;
+    double reset_integrated_right_wheel_position;
+    double reset_integrated_turn_position;
+
 };
 
 // Callback wrapper
