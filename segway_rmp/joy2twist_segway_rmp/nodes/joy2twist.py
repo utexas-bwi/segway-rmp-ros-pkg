@@ -29,7 +29,7 @@ Parameters:
     angular_scalar (default: 0.2) This is a linear scalar that is multiplied by the joystick message. (0.2 will result in a 0.2 rad/s cmd_vel with a joystick msg of 1.0)
 
 Topics:
-    Subcribes to joy joy/Joy
+    Subcribes to joy sensor_msgs/Joy
     Publishes to cmd_vel geometry_msgs/Twist
 
 Created by William Woodall on 2010-07-12.
@@ -43,7 +43,7 @@ import roslib; roslib.load_manifest('joy2twist_segway_rmp')
 import rospy
 
 # ROS msg and srv imports
-from joy.msg import Joy
+from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Twist
 
 # Python Libraries
@@ -64,9 +64,9 @@ class Joy2Twist(object):
         rospy.init_node("Joy2Twist")
         
         # Get the linear scalar and angular scalar parameter
-        LINEAR_SCALAR = rospy.get_param('~max_linear_vel', 0.2)
-        ANGULAR_SCALAR = rospy.get_param('~max_angular_vel', 0.05)
-        rospy.loginfo("Using max_linear_vel: %f and max_angular_vel: %f" % (LINEAR_SCALAR, ANGULAR_SCALAR))
+        LINEAR_SCALAR = rospy.get_param('~linear_scalar', 0.2)
+        ANGULAR_SCALAR = rospy.get_param('~angular_scalar', 0.05)
+        rospy.loginfo("Using linear_scalar: %f and angular_scalar: %f" % (LINEAR_SCALAR, ANGULAR_SCALAR))
         
         # Setup the Joy topic subscription
         self.joy_subscriber = rospy.Subscriber("joy", Joy, self.handleJoyMessage, queue_size=1)
@@ -81,16 +81,8 @@ class Joy2Twist(object):
         """Handles incoming Joy messages"""
         global LINEAR_SCALAR, ANGULAR_SCALAR
         msg = Twist()
-        trigger_val = data.axes[2]
-        trigger_val += 1
-        trigger_val /= 2
-        trigger_val = 1 - trigger_val
-#        msg.linear.x = data.axes[1] * LINEAR_SCALAR
-#        msg.angular.z = data.axes[0] * ANGULAR_SCALAR
-#        msg.linear.x = data.axes[1] * LINEAR_SCALAR * (1 + ((1 - (1 + data.axes[2])/2.0)*5))
-#        msg.angular.z = data.axes[0] * ANGULAR_SCALAR * (1 + ((1 - (1 + data.axes[2])/2.0)*3))
-        msg.linear.x = data.axes[1] * (LINEAR_SCALAR/4.0 + trigger_val*(LINEAR_SCALAR*3.0/4.0))
-        msg.angular.z = data.axes[0] * (ANGULAR_SCALAR/4.0 + trigger_val*(ANGULAR_SCALAR*3.0/4.0))
+        msg.linear.x = data.axes[1] * (LINEAR_SCALAR)
+        msg.angular.z = data.axes[0] * (ANGULAR_SCALAR)
         self.twist_publisher.publish(msg)
     
 
