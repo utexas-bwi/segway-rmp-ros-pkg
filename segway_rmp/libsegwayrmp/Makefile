@@ -1,7 +1,7 @@
 all: installed
 
 GIT_DIR = build/libsegwayrmp-git
-GIT_URL = git://github.com/wjwwood/libsegwayrmp.git
+GIT_URL = git://github.com/piyushk/libsegwayrmp.git
 include $(shell rospack find mk)/git_checkout.mk
 
 CMAKE = cmake 
