@@ -231,6 +231,28 @@ public:
           }
         }
 
+        // Check for malformed values from segway integrator, when sometimes these values are zero.
+        if (fabs(ss.integrated_forward_position) < 1e-3 && fabs(last_status.integrated_forward_position) > 1e-1) {
+          ROS_DEBUG_STREAM("Corrected malformed integrated_forward_position from " << 
+                           ss.integrated_forward_position << " to " << last_status.integrated_forward_position);
+          ss.integrated_forward_position = last_status.integrated_forward_position;
+        }
+        if (fabs(ss.integrated_turn_position) < 1e-3 && fabs(last_status.integrated_turn_position) > 1e-1) {
+          ROS_DEBUG_STREAM("Corrected malformed integrated_turn_position from " << 
+                           ss.integrated_turn_position << " to " << last_status.integrated_turn_position);
+          ss.integrated_turn_position = last_status.integrated_turn_position;
+        }
+        if (fabs(ss.integrated_left_wheel_position) < 1e-3 && fabs(last_status.integrated_left_wheel_position) > 1e-1) {
+          ROS_DEBUG_STREAM("Corrected malformed integrated_left_wheel_position from " << 
+                           ss.integrated_left_wheel_position << " to " << last_status.integrated_left_wheel_position);
+          ss.integrated_left_wheel_position = last_status.integrated_left_wheel_position;
+        }
+        if (fabs(ss.integrated_right_wheel_position) < 1e-3 && fabs(last_status.integrated_right_wheel_position) > 1e-1) {
+          ROS_DEBUG_STREAM("Corrected malformed integrated_right_wheel_position from " << 
+                           ss.integrated_right_wheel_position << " to " << last_status.integrated_right_wheel_position);
+          ss.integrated_right_wheel_position = last_status.integrated_right_wheel_position;
+        }
+        
         this->sss_msg.segway.pitch_angle = ss.pitch * degrees_to_radians;
         this->sss_msg.segway.pitch_rate = ss.pitch_rate * degrees_to_radians;
         this->sss_msg.segway.roll_angle = ss.roll * degrees_to_radians;
@@ -258,7 +280,7 @@ public:
         segway_status_pub.publish(this->sss_msg);
         
         // TODO: possibly spin this off in another thread
-        
+
         // Grab the newest Segway data
         float forward_displacement = 
             (ss.integrated_forward_position - this->initial_integrated_forward_position) * 
@@ -294,6 +316,7 @@ public:
         this->last_forward_displacement = forward_displacement;
         this->last_yaw_displacement = yaw_displacement;
         this->last_time = current_time;
+        this->last_status = ss;
         
         // Create a Quaternion from the yaw displacement
         geometry_msgs::Quaternion quat = 
@@ -617,6 +640,8 @@ private:
     bool first_odometry;
     float last_forward_displacement;
     float last_yaw_displacement;
+    segwayrmp::SegwayStatus last_status;
+
     float odometry_x;
     float odometry_y;
     float odometry_w;
